@@ -30,7 +30,8 @@ export function registerIpcHandlers() {
       await creds.saveToken(result.access_token);
       return { success: true };
     } catch (e) {
-      // MVP デバッグ用 — 元のエラーをそのまま伝播（後でサニタイズを再追加予定）
+      console.error('[auth:pollToken] ERROR:', e);
+      console.error('[auth:pollToken] stack:', (e as Error).stack);
       throw e;
     }
   });

@@ -18,6 +18,7 @@ function defaultFetchClient(url: string, init: {
   body?: string;
   signal?: AbortSignal;
 }): Promise<{ ok: boolean; status: number; json(): Promise<any> }> {
+  console.error('[http] POST', url, 'body=', init.body);
   // Lazy-require: Vitest 環境 (Electron なし) でもテスト可能にするため遅延読み込み
   const { net } = require('electron');
   return new Promise((resolve, reject) => {
@@ -35,18 +36,20 @@ function defaultFetchClient(url: string, init: {
     const chunks: Buffer[] = [];
     request.on('response', (response: any) => {
       status = response.statusCode;
+      console.error('[http] response status=', status);
       response.on('data', (chunk: Buffer) => chunks.push(chunk));
       response.on('end', () => {
         const text = Buffer.concat(chunks).toString('utf8');
+        console.error('[http] body=', text);
         resolve({
           ok: status >= 200 && status < 300,
           status,
           async json() { return JSON.parse(text); },
         });
       });
-      response.on('error', (e: Error) => reject(e));
+      response.on('error', (e: Error) => { console.error('[http] response error', e); reject(e); });
     });
-    request.on('error', (e: Error) => reject(e));
+    request.on('error', (e: Error) => { console.error('[http] request error', e); reject(e); });
     if (init.body) request.write(init.body);
     request.end();
 
@@ -91,7 +94,11 @@ export async function startDeviceFlow(clientId: string): Promise<DeviceCodeRespo
   try {
     res = await httpClient('https://github.com/login/device/code', {
       method: 'POST',
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'DocMDTest-Desktop/0.1.0',
+      },
       body: new URLSearchParams({ client_id: clientId, scope: 'repo' }).toString(),
     });
   } catch (e) {
@@ -121,7 +128,11 @@ export async function pollAccessToken(
     try {
       res = await httpClient('https://github.com/login/oauth/access_token', {
         method: 'POST',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'DocMDTest-Desktop/0.1.0',
+        },
         body: new URLSearchParams({
           client_id: clientId,
           device_code: deviceCode,
