@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CredentialStore, SERVICE, ACCOUNT } from '../src/auth';
 import { startDeviceFlow } from '../src/auth';
+import { pollAccessToken } from '../src/auth';
 
 vi.mock('keytar', () => ({
   default: {
@@ -56,5 +57,31 @@ describe('startDeviceFlow', () => {
       expect.objectContaining({ method: 'POST' })
     );
     expect(result.user_code).toBe('1234-ABCD');
+  });
+});
+
+describe('pollAccessToken', () => {
+  beforeEach(() => { vi.restoreAllMocks(); vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('returns access token after authorization_pending', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ error: 'authorization_pending' }) } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'gho_test', token_type: 'bearer', scope: 'repo' }) } as any);
+
+    const promise = pollAccessToken('cid', 'dev', 1, 10);
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
+    expect(result.access_token).toBe('gho_test');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws on non-OK HTTP response', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as any);
+    const promise = pollAccessToken('cid', 'dev', 1, 10);
+    const advancePromise = vi.advanceTimersByTimeAsync(1000);
+    await expect(promise).rejects.toThrow(/HTTP 500/);
+    await advancePromise;
   });
 });

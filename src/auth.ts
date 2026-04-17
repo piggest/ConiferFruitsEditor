@@ -24,11 +24,16 @@ export type DeviceCodeResponse = {
 };
 
 export async function startDeviceFlow(clientId: string): Promise<DeviceCodeResponse> {
-  const res = await fetch('https://github.com/login/device/code', {
-    method: 'POST',
-    headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: clientId, scope: 'repo' }),
-  });
+  let res: Response;
+  try {
+    res = await fetch('https://github.com/login/device/code', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: clientId, scope: 'repo' }),
+    });
+  } catch (e) {
+    throw new Error(`GitHub への接続に失敗: ${(e as Error).message}`);
+  }
   if (!res.ok) throw new Error(`Device code request failed: ${res.status}`);
   return res.json();
 }
@@ -46,17 +51,32 @@ export async function pollAccessToken(
   let interval = intervalSec;
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new Error('Cancelled');
-    await new Promise(r => setTimeout(r, interval * 1000));
-    const res = await fetch('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId,
-        device_code: deviceCode,
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-      }),
-    });
-    const json = await res.json();
+    const waitMs = Math.min(interval * 1000, deadline - Date.now());
+    if (waitMs <= 0) break;
+    await new Promise(r => setTimeout(r, waitMs));
+    let res: Response;
+    try {
+      res = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          device_code: deviceCode,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        }),
+        signal,
+      });
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') throw new Error('Cancelled');
+      throw new Error(`polling network error: ${(e as Error).message}`);
+    }
+    if (!res.ok) throw new Error(`polling HTTP ${res.status}`);
+    let json: any;
+    try {
+      json = await res.json();
+    } catch {
+      throw new Error('polling response is not valid JSON');
+    }
     if (json.access_token) return json;
     if (json.error === 'authorization_pending') continue;
     if (json.error === 'slow_down') { interval += 5; continue; }
