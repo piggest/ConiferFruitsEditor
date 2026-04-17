@@ -7,7 +7,7 @@ export function parseEditUrl(url: string): EditRequest | null {
     if (u.hostname !== 'edit') return null;
     const path = u.searchParams.get('path');
     if (!path) return null;
-    return { action: 'edit', path: decodeURIComponent(path) };
+    return { action: 'edit', path };
   } catch {
     return null;
   }

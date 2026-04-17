@@ -14,4 +14,19 @@ describe('parseEditUrl', () => {
   it('returns null for missing path on edit', () => {
     expect(parseEditUrl('docmdtest://edit')).toBeNull();
   });
+
+  it('handles literal percent in path (%25)', () => {
+    // searchParams.get auto-decodes %2525 → %25
+    expect(parseEditUrl('docmdtest://edit?path=foo%2525bar')).toEqual({
+      action: 'edit', path: 'foo%25bar',
+    });
+  });
+
+  it('returns null when protocol is wrong', () => {
+    expect(parseEditUrl('docmdview://edit?path=x')).toBeNull();
+  });
+
+  it('returns null when path query is empty', () => {
+    expect(parseEditUrl('docmdtest://edit?path=')).toBeNull();
+  });
 });
