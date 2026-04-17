@@ -3,6 +3,7 @@ import { BlockNoteView } from '@blocknote/mantine';
 import { useCreateBlockNote } from '@blocknote/react';
 import '@blocknote/mantine/style.css';
 import { normalizeMd } from './mdConverter';
+import Toolbar from './Toolbar';
 
 type Props = { path: string; onLogout: () => void };
 
@@ -75,6 +76,7 @@ export default function Editor({ path, onLogout }: Props) {
         <button onClick={onLogout}>ログアウト</button>
       </div>
       {error && <div style={{ padding: 12, color: 'red', background: '#fee' }}>エラー: {error}</div>}
+      <Toolbar editor={editor as any} />
       <div style={{ flex: 1, overflow: 'auto' }}>
         <BlockNoteView editor={editor} onChange={handleChange} />
       </div>
