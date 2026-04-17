@@ -14,12 +14,17 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     osxSign: false,
+    icon: 'build-resources/icons/icon',
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      setupIcon: 'build-resources/icons/icon.ico',
+    }),
     new MakerZIP({}, ['darwin']),
-    new MakerDMG({}, ['darwin']),
+    new MakerDMG({
+      icon: 'build-resources/icons/icon.icns',
+    }, ['darwin']),
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),
