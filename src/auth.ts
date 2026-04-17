@@ -1,7 +1,7 @@
 import keytar from 'keytar';
 
-const SERVICE = 'DocMDTest-desktop';
-const ACCOUNT = 'github-token';
+export const SERVICE = 'DocMDTest-desktop';
+export const ACCOUNT = 'github-token';
 
 export class CredentialStore {
   async saveToken(token: string): Promise<void> {

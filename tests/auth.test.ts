@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CredentialStore } from '../src/auth';
+import { CredentialStore, SERVICE, ACCOUNT } from '../src/auth';
 
 vi.mock('keytar', () => ({
   default: {
@@ -17,7 +17,7 @@ describe('CredentialStore', () => {
   it('stores token under service name', async () => {
     const store = new CredentialStore();
     await store.saveToken('ghp_xxx');
-    expect(keytar.setPassword).toHaveBeenCalledWith('DocMDTest-desktop', 'github-token', 'ghp_xxx');
+    expect(keytar.setPassword).toHaveBeenCalledWith(SERVICE, ACCOUNT, 'ghp_xxx');
   });
 
   it('retrieves stored token', async () => {
