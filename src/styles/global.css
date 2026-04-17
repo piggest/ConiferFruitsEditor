@@ -1,19 +1,15 @@
-/* BlockNote 編集エリアの最大幅を広げる */
+/* BlockNote デフォルトの padding-inline: 54px を詰める */
 .bn-editor {
+  padding-inline: 20px !important;
   max-width: none !important;
 }
 
-/* 段落など個別ブロックの最大幅も解除 */
+/* コンテナ / ブロックも最大幅を解除 */
+.bn-container,
 .bn-block-outer,
 .bn-block-content,
 [class*='bn-default-styles'] {
   max-width: none !important;
-}
-
-/* 左右の余白を控えめに（デフォルト54pxから詰める） */
-.bn-container {
-  padding-left: 24px;
-  padding-right: 24px;
 }
 
 /* テーブルがウィンドウ幅に応じて広がるよう */
