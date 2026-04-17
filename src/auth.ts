@@ -1,7 +1,13 @@
-import keytar from 'keytar';
+import { app, safeStorage } from 'electron';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 
 export const SERVICE = 'DocMDTest-desktop';
 export const ACCOUNT = 'github-token';
+
+function tokenFilePath(): string {
+  return path.join(app.getPath('userData'), 'github-token.enc');
+}
 
 // HTTP クライアント抽象層。本番は Electron net (Chromium スタック — プロキシ/証明書を自動処理)、
 // テスト時はモックを注入可能。
@@ -71,13 +77,29 @@ export function resetHttpClient(): void { httpClient = defaultFetchClient; }
 
 export class CredentialStore {
   async saveToken(token: string): Promise<void> {
-    await keytar.setPassword(SERVICE, ACCOUNT, token);
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error('OS encryption not available');
+    }
+    const buf = safeStorage.encryptString(token);
+    await fs.writeFile(tokenFilePath(), buf);
   }
+
   async getToken(): Promise<string | null> {
-    return keytar.getPassword(SERVICE, ACCOUNT);
+    try {
+      const buf = await fs.readFile(tokenFilePath());
+      return safeStorage.decryptString(buf);
+    } catch (e: any) {
+      if (e.code === 'ENOENT') return null;
+      throw e;
+    }
   }
+
   async clearToken(): Promise<void> {
-    await keytar.deletePassword(SERVICE, ACCOUNT);
+    try {
+      await fs.unlink(tokenFilePath());
+    } catch (e: any) {
+      if (e.code !== 'ENOENT') throw e;
+    }
   }
 }
 

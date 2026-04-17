@@ -3,33 +3,44 @@ import { CredentialStore, SERVICE, ACCOUNT, setHttpClient, resetHttpClient } fro
 import { startDeviceFlow } from '../src/auth';
 import { pollAccessToken } from '../src/auth';
 
-vi.mock('keytar', () => ({
-  default: {
-    getPassword: vi.fn(),
-    setPassword: vi.fn(),
-    deletePassword: vi.fn(),
+vi.mock('electron', () => ({
+  app: { getPath: () => '/tmp/docmdtest-test' },
+  safeStorage: {
+    isEncryptionAvailable: () => true,
+    encryptString: (s: string) => Buffer.from('enc:' + s),
+    decryptString: (b: Buffer) => b.toString('utf8').replace(/^enc:/, ''),
   },
 }));
 
-import keytar from 'keytar';
+vi.mock('node:fs', () => ({
+  promises: {
+    writeFile: vi.fn(),
+    readFile: vi.fn(),
+    unlink: vi.fn(),
+  },
+}));
+
+import { promises as fs } from 'node:fs';
 
 describe('CredentialStore', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it('stores token under service name', async () => {
+  it('encrypts and writes token on save', async () => {
     const store = new CredentialStore();
     await store.saveToken('ghp_xxx');
-    expect(keytar.setPassword).toHaveBeenCalledWith(SERVICE, ACCOUNT, 'ghp_xxx');
+    expect(fs.writeFile).toHaveBeenCalled();
+    const [, buf] = (fs.writeFile as any).mock.calls[0];
+    expect(Buffer.isBuffer(buf) || buf instanceof Uint8Array).toBe(true);
   });
 
-  it('retrieves stored token', async () => {
-    (keytar.getPassword as any).mockResolvedValue('ghp_xxx');
+  it('reads and decrypts token on get', async () => {
+    (fs.readFile as any).mockResolvedValue(Buffer.from('enc:ghp_xxx'));
     const store = new CredentialStore();
     expect(await store.getToken()).toBe('ghp_xxx');
   });
 
-  it('returns null when no token stored', async () => {
-    (keytar.getPassword as any).mockResolvedValue(null);
+  it('returns null when no token file', async () => {
+    (fs.readFile as any).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
     const store = new CredentialStore();
     expect(await store.getToken()).toBeNull();
   });

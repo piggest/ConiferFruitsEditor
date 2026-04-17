@@ -51,7 +51,6 @@
     "@blocknote/react": "^0.48.1",
     "@octokit/rest": "^22.0.1",
     "electron-squirrel-startup": "^1.0.1",
-    "keytar": "^7.9.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   }
