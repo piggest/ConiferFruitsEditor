@@ -8,6 +8,13 @@ import Toolbar from './Toolbar';
 
 type Props = { path: string };
 
+// customCss の各宣言に !important を付与して BlockNote 既定スタイルより優先させる
+function boostImportant(css: string): string {
+  return css.replace(/([a-zA-Z-][\w-]*)\s*:\s*([^;{}]+?)(\s*!important)?\s*;/g, (_m, prop, val) => {
+    return `${prop}: ${val.trim()} !important;`;
+  });
+}
+
 export default function Editor({ path }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -88,18 +95,33 @@ export default function Editor({ path }: Props) {
         </button>
       </div>
       {error && <div style={{ padding: 12, color: 'red', background: '#fee' }}>エラー: {error}</div>}
-      {/* カスケードCSSを注入する。BlockNote が見出しブロックに大きい font-size を入れるので、
-          em 計算が想定外に大きくなる。ブロック側を 16px にリセットしてからカスケードCSSを後勝ちで適用。 */}
+      {/* BlockNote の既定スタイルはセレクタ特異度が高く、customCss を押しのける。
+          em 基準を 16px に合わせた上で、customCss の全宣言に !important を付与してサイトと同じ見た目にする */}
       {customCss && (
         <style dangerouslySetInnerHTML={{ __html: `
-          .theme-doc-markdown,
+          /* BlockNoteがコンテナ階層でfont-sizeを積み増しているため em が暴発する。
+             コンテナは 16px に揃え、見出し要素そのものには customCss を優先させる */
           .theme-doc-markdown .bn-editor,
           .theme-doc-markdown .bn-block-outer,
-          .theme-doc-markdown .bn-block-content,
-          .theme-doc-markdown .bn-inline-content { font-size: 16px !important; }
-          .theme-doc-markdown h1, .theme-doc-markdown h2,
-          .theme-doc-markdown h3, .theme-doc-markdown h4 { all: revert; }
-          ${customCss}
+          .theme-doc-markdown .bn-block,
+          .theme-doc-markdown .bn-block-content { font-size: 16px !important; }
+          /* BlockNote がブロック間に padding を入れていて縦が間延びする。
+             customCss の margin に任せるため padding は潰す */
+          .theme-doc-markdown .bn-block-outer,
+          .theme-doc-markdown .bn-block {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+          }
+          /* BlockNote の見出しは inline 扱いで文字幅までしか広がらない。
+             サイトと同じく親幅いっぱいに伸ばして border-bottom を揃える */
+          .theme-doc-markdown .bn-editor h1,
+          .theme-doc-markdown .bn-editor h2,
+          .theme-doc-markdown .bn-editor h3,
+          .theme-doc-markdown .bn-editor h4 {
+            display: block !important;
+            width: 100% !important;
+          }
+          ${boostImportant(customCss)}
         ` }} />
       )}
       <div className="theme-doc-markdown" style={{ flex: 1, overflow: 'auto' }}>
