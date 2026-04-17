@@ -41,10 +41,15 @@ function handleEditUrl(url: string) {
   if (mainWindowRef) {
     mainWindowRef.webContents.send('edit-request', req);
     if (mainWindowRef.isMinimized()) mainWindowRef.restore();
+    if (!mainWindowRef.isVisible()) mainWindowRef.show();
     mainWindowRef.focus();
   } else {
     pendingEditRequest = req;
+    // ウィンドウが閉じた状態で URL が飛んできた場合は新規ウィンドウを開く
+    if (app.isReady()) createWindow();
   }
+  // ブラウザから呼び出された場合にアプリ自体を前面へ強制移動する
+  app.focus({ steal: true });
 }
 
 // 2つ目のインスタンスが起動しようとしたとき、URLを受け取って処理する
