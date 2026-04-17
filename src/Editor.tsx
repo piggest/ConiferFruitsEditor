@@ -88,8 +88,15 @@ export default function Editor({ path }: Props) {
         </button>
       </div>
       {error && <div style={{ padding: 12, color: 'red', background: '#fee' }}>エラー: {error}</div>}
-      {/* カスケードCSSを注入する */}
-      {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
+      {/* カスケードCSSを注入する。emをサイト同等に解決させるため、ラッパーで font-size を 16px にリセット */}
+      {customCss && (
+        <style dangerouslySetInnerHTML={{ __html: `
+          .theme-doc-markdown { font-size: 16px; }
+          .theme-doc-markdown .bn-editor,
+          .theme-doc-markdown .bn-block-content { font-size: 16px; }
+          ${customCss}
+        ` }} />
+      )}
       <div className="theme-doc-markdown" style={{ flex: 1, overflow: 'auto' }}>
         <BlockNoteView editor={editor} onChange={handleChange} />
       </div>
