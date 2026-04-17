@@ -1,10 +1,15 @@
 import { Octokit } from '@octokit/rest';
+import { electronFetch } from './electronFetch';
 
 export class GitHubClient {
   constructor(private readonly octokit: Octokit | any) {}
 
   static fromToken(token: string): GitHubClient {
-    return new GitHubClient(new Octokit({ auth: token }));
+    // electronFetch を使い、Chromium の証明書ストア経由でリクエストを送る
+    return new GitHubClient(new Octokit({
+      auth: token,
+      request: { fetch: electronFetch },
+    }));
   }
 
   async fetchFile(owner: string, repo: string, path: string): Promise<{ content: string; sha: string }> {
