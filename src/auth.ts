@@ -6,7 +6,7 @@ export const SERVICE = 'DocMDTest-desktop';
 export const ACCOUNT = 'github-token';
 
 function tokenFilePath(): string {
-  return path.join(app.getPath('userData'), 'github-token.enc');
+  return path.join(app.getPath('userData'), 'github-token.bin');
 }
 
 // HTTP クライアント抽象層。本番は Electron net (Chromium スタック — プロキシ/証明書を自動処理)、
@@ -77,16 +77,22 @@ export function resetHttpClient(): void { httpClient = defaultFetchClient; }
 
 export class CredentialStore {
   async saveToken(token: string): Promise<void> {
-    if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error('OS encryption not available');
+    if (safeStorage.isEncryptionAvailable()) {
+      const buf = safeStorage.encryptString(token);
+      await fs.writeFile(tokenFilePath(), buf);
+    } else {
+      console.warn('[auth] safeStorage unavailable — storing token as plaintext. Sign the app to enable OS encryption.');
+      await fs.writeFile(tokenFilePath(), Buffer.from('PLAIN:' + token, 'utf8'));
     }
-    const buf = safeStorage.encryptString(token);
-    await fs.writeFile(tokenFilePath(), buf);
   }
 
   async getToken(): Promise<string | null> {
     try {
       const buf = await fs.readFile(tokenFilePath());
+      const asText = buf.toString('utf8');
+      if (asText.startsWith('PLAIN:')) {
+        return asText.slice('PLAIN:'.length);
+      }
       return safeStorage.decryptString(buf);
     } catch (e: any) {
       if (e.code === 'ENOENT') return null;

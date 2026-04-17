@@ -6,7 +6,7 @@ import { pollAccessToken } from '../src/auth';
 vi.mock('electron', () => ({
   app: { getPath: () => '/tmp/docmdtest-test' },
   safeStorage: {
-    isEncryptionAvailable: () => true,
+    isEncryptionAvailable: vi.fn(() => true),
     encryptString: (s: string) => Buffer.from('enc:' + s),
     decryptString: (b: Buffer) => b.toString('utf8').replace(/^enc:/, ''),
   },
@@ -21,9 +21,10 @@ vi.mock('node:fs', () => ({
 }));
 
 import { promises as fs } from 'node:fs';
+import { safeStorage } from 'electron';
 
 describe('CredentialStore', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); (safeStorage.isEncryptionAvailable as any).mockReturnValue(true); });
 
   it('encrypts and writes token on save', async () => {
     const store = new CredentialStore();
@@ -43,6 +44,14 @@ describe('CredentialStore', () => {
     (fs.readFile as any).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
     const store = new CredentialStore();
     expect(await store.getToken()).toBeNull();
+  });
+
+  it('falls back to plain file when safeStorage unavailable', async () => {
+    (safeStorage.isEncryptionAvailable as any).mockReturnValueOnce(false);
+    const store = new CredentialStore();
+    await store.saveToken('ghp_plain');
+    const [, buf] = (fs.writeFile as any).mock.calls[0];
+    expect(buf.toString('utf8')).toBe('PLAIN:ghp_plain');
   });
 });
 
