@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CredentialStore, SERVICE, ACCOUNT } from '../src/auth';
+import { startDeviceFlow } from '../src/auth';
 
 vi.mock('keytar', () => ({
   default: {
@@ -30,5 +31,30 @@ describe('CredentialStore', () => {
     (keytar.getPassword as any).mockResolvedValue(null);
     const store = new CredentialStore();
     expect(await store.getToken()).toBeNull();
+  });
+});
+
+describe('startDeviceFlow', () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  it('requests device code from GitHub', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        device_code: 'abc',
+        user_code: '1234-ABCD',
+        verification_uri: 'https://github.com/login/device',
+        expires_in: 900,
+        interval: 5,
+      }),
+    } as any);
+
+    const result = await startDeviceFlow('test-client-id');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://github.com/login/device/code',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(result.user_code).toBe('1234-ABCD');
   });
 });

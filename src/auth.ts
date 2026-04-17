@@ -14,3 +14,53 @@ export class CredentialStore {
     await keytar.deletePassword(SERVICE, ACCOUNT);
   }
 }
+
+export type DeviceCodeResponse = {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+};
+
+export async function startDeviceFlow(clientId: string): Promise<DeviceCodeResponse> {
+  const res = await fetch('https://github.com/login/device/code', {
+    method: 'POST',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: clientId, scope: 'repo' }),
+  });
+  if (!res.ok) throw new Error(`Device code request failed: ${res.status}`);
+  return res.json();
+}
+
+export type AccessTokenResponse = { access_token: string; token_type: string; scope: string };
+
+export async function pollAccessToken(
+  clientId: string,
+  deviceCode: string,
+  intervalSec: number,
+  timeoutSec: number,
+  signal?: AbortSignal
+): Promise<AccessTokenResponse> {
+  const deadline = Date.now() + timeoutSec * 1000;
+  let interval = intervalSec;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new Error('Cancelled');
+    await new Promise(r => setTimeout(r, interval * 1000));
+    const res = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        device_code: deviceCode,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      }),
+    });
+    const json = await res.json();
+    if (json.access_token) return json;
+    if (json.error === 'authorization_pending') continue;
+    if (json.error === 'slow_down') { interval += 5; continue; }
+    throw new Error(`OAuth error: ${json.error_description || json.error}`);
+  }
+  throw new Error('Device flow timed out');
+}
