@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BlockNoteView } from '@blocknote/mantine';
 import { useCreateBlockNote } from '@blocknote/react';
 import '@blocknote/mantine/style.css';
-import { normalizeMd } from './mdConverter';
+import { normalizeMd, splitFrontmatter, decodeLinkUris } from './mdConverter';
 import Toolbar from './Toolbar';
 
 type Props = { path: string; onLogout: () => void };
@@ -13,6 +13,7 @@ export default function Editor({ path, onLogout }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [sha, setSha] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [frontmatter, setFrontmatter] = useState('');
 
   const editor = useCreateBlockNote();
 
@@ -24,7 +25,9 @@ export default function Editor({ path, onLogout }: Props) {
         setError(null);
         const { content, sha: fileSha } = await window.api.github.fetchFile(path);
         if (cancelled) return;
-        const blocks = await editor.tryParseMarkdownToBlocks(content);
+        const { frontmatter: fm, body } = splitFrontmatter(content);
+        setFrontmatter(fm);
+        const blocks = await editor.tryParseMarkdownToBlocks(body);
         editor.replaceBlocks(editor.document, blocks);
         setSha(fileSha);
         setDirty(false);
@@ -46,7 +49,9 @@ export default function Editor({ path, onLogout }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const md = normalizeMd(await editor.blocksToMarkdownLossy(editor.document));
+      const rawBody = await editor.blocksToMarkdownLossy(editor.document);
+      const decodedBody = decodeLinkUris(rawBody);
+      const md = normalizeMd(frontmatter + decodedBody);
       await window.api.github.putFile({
         path,
         content: md,
