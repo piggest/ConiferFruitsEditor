@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, app as electronApp } from 'electron';
 import { CredentialStore, startDeviceFlow, pollAccessToken } from './auth';
 import { GitHubClient } from './github';
 import { GITHUB_CLIENT_ID, REPO_OWNER, REPO_NAME } from './config';
@@ -55,6 +55,9 @@ export function registerIpcHandlers() {
     const client = GitHubClient.fromToken(token);
     return client.fetchFile(REPO_OWNER, REPO_NAME, path);
   });
+
+  // アプリのバージョンを返す
+  ipcMain.handle('app:getVersion', async () => electronApp.getVersion());
 
   // GitHubへファイルを書き込む
   ipcMain.handle('github:putFile', async (_e, args: { path: string; content: string; sha: string; message: string }) => {

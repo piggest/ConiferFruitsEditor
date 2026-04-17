@@ -23,6 +23,9 @@ declare global {
           message: string;
         }): Promise<{ success: boolean }>;
       };
+      app: {
+        getVersion(): Promise<string>;
+      };
       onEditRequest(cb: (r: { action: string; path: string }) => void): () => void;
       onMenuLogout(cb: () => void): () => void;
     };

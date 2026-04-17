@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('api', {
     putFile: (args: { path: string; content: string; sha: string; message: string }) =>
       ipcRenderer.invoke('github:putFile', args),
   },
+  app: {
+    getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  },
   onEditRequest: (cb: (r: { action: string; path: string }) => void) => {
     const handler = (_e: Electron.IpcRendererEvent, r: { action: string; path: string }) => cb(r);
     ipcRenderer.on('edit-request', handler);
