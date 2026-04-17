@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { CredentialStore, SERVICE, ACCOUNT } from '../src/auth';
+import { CredentialStore, SERVICE, ACCOUNT, setHttpClient, resetHttpClient } from '../src/auth';
 import { startDeviceFlow } from '../src/auth';
 import { pollAccessToken } from '../src/auth';
 
@@ -36,49 +36,59 @@ describe('CredentialStore', () => {
 });
 
 describe('startDeviceFlow', () => {
-  beforeEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => { resetHttpClient(); });
 
   it('requests device code from GitHub', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        device_code: 'abc',
-        user_code: '1234-ABCD',
-        verification_uri: 'https://github.com/login/device',
-        expires_in: 900,
-        interval: 5,
-      }),
-    } as any);
+    let capturedUrl = '';
+    let capturedInit: any = {};
+    setHttpClient(async (url, init) => {
+      capturedUrl = url;
+      capturedInit = init;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          device_code: 'abc',
+          user_code: '1234-ABCD',
+          verification_uri: 'https://github.com/login/device',
+          expires_in: 900,
+          interval: 5,
+        }),
+      };
+    });
 
     const result = await startDeviceFlow('test-client-id');
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      'https://github.com/login/device/code',
-      expect.objectContaining({ method: 'POST' })
-    );
+    expect(capturedUrl).toBe('https://github.com/login/device/code');
+    expect(capturedInit.method).toBe('POST');
     expect(result.user_code).toBe('1234-ABCD');
   });
 });
 
 describe('pollAccessToken', () => {
-  beforeEach(() => { vi.restoreAllMocks(); vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); resetHttpClient(); });
 
   it('returns access token after authorization_pending', async () => {
-    const fetchMock = vi.spyOn(global, 'fetch')
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ error: 'authorization_pending' }) } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'gho_test', token_type: 'bearer', scope: 'repo' }) } as any);
+    let callCount = 0;
+    setHttpClient(async () => {
+      callCount++;
+      if (callCount === 1) {
+        return { ok: true, status: 200, json: async () => ({ error: 'authorization_pending' }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ access_token: 'gho_test', token_type: 'bearer', scope: 'repo' }) };
+    });
 
     const promise = pollAccessToken('cid', 'dev', 1, 10);
     await vi.advanceTimersByTimeAsync(1000);
     await vi.advanceTimersByTimeAsync(1000);
     const result = await promise;
     expect(result.access_token).toBe('gho_test');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(callCount).toBe(2);
   });
 
   it('throws on non-OK HTTP response', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as any);
+    setHttpClient(async () => ({ ok: false, status: 500, json: async () => ({}) }));
     const promise = pollAccessToken('cid', 'dev', 1, 10);
     const advancePromise = vi.advanceTimersByTimeAsync(1000);
     await expect(promise).rejects.toThrow(/HTTP 500/);

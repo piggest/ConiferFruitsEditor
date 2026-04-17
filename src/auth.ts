@@ -3,6 +3,69 @@ import keytar from 'keytar';
 export const SERVICE = 'DocMDTest-desktop';
 export const ACCOUNT = 'github-token';
 
+// HTTP クライアント抽象層。本番は Electron net (Chromium スタック — プロキシ/証明書を自動処理)、
+// テスト時はモックを注入可能。
+export type HttpClient = (url: string, init: {
+  method: string;
+  headers?: Record<string, string>;
+  body?: string;
+  signal?: AbortSignal;
+}) => Promise<{ ok: boolean; status: number; json(): Promise<any> }>;
+
+function defaultFetchClient(url: string, init: {
+  method: string;
+  headers?: Record<string, string>;
+  body?: string;
+  signal?: AbortSignal;
+}): Promise<{ ok: boolean; status: number; json(): Promise<any> }> {
+  // Lazy-require: Vitest 環境 (Electron なし) でもテスト可能にするため遅延読み込み
+  const { net } = require('electron');
+  return new Promise((resolve, reject) => {
+    if (init.signal?.aborted) {
+      reject(new Error('AbortError'));
+      return;
+    }
+    const request = net.request({ method: init.method, url });
+    if (init.headers) {
+      for (const [k, v] of Object.entries(init.headers)) {
+        request.setHeader(k, v as string);
+      }
+    }
+    let status = 0;
+    const chunks: Buffer[] = [];
+    request.on('response', (response: any) => {
+      status = response.statusCode;
+      response.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolve({
+          ok: status >= 200 && status < 300,
+          status,
+          async json() { return JSON.parse(text); },
+        });
+      });
+      response.on('error', (e: Error) => reject(e));
+    });
+    request.on('error', (e: Error) => reject(e));
+    if (init.body) request.write(init.body);
+    request.end();
+
+    // AbortSignal 対応
+    if (init.signal) {
+      init.signal.addEventListener('abort', () => {
+        const err = new Error('AbortError');
+        err.name = 'AbortError';
+        reject(err);
+      });
+    }
+  });
+}
+
+let httpClient: HttpClient = defaultFetchClient;
+
+export function setHttpClient(client: HttpClient): void { httpClient = client; }
+export function resetHttpClient(): void { httpClient = defaultFetchClient; }
+
 export class CredentialStore {
   async saveToken(token: string): Promise<void> {
     await keytar.setPassword(SERVICE, ACCOUNT, token);
@@ -24,12 +87,12 @@ export type DeviceCodeResponse = {
 };
 
 export async function startDeviceFlow(clientId: string): Promise<DeviceCodeResponse> {
-  let res: Response;
+  let res: { ok: boolean; status: number; json(): Promise<any> };
   try {
-    res = await fetch('https://github.com/login/device/code', {
+    res = await httpClient('https://github.com/login/device/code', {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: clientId, scope: 'repo' }),
+      body: new URLSearchParams({ client_id: clientId, scope: 'repo' }).toString(),
     });
   } catch (e) {
     throw new Error(`GitHub への接続に失敗: ${(e as Error).message}`);
@@ -54,16 +117,16 @@ export async function pollAccessToken(
     const waitMs = Math.min(interval * 1000, deadline - Date.now());
     if (waitMs <= 0) break;
     await new Promise(r => setTimeout(r, waitMs));
-    let res: Response;
+    let res: { ok: boolean; status: number; json(): Promise<any> };
     try {
-      res = await fetch('https://github.com/login/oauth/access_token', {
+      res = await httpClient('https://github.com/login/oauth/access_token', {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           client_id: clientId,
           device_code: deviceCode,
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        }),
+        }).toString(),
         signal,
       });
     } catch (e) {
