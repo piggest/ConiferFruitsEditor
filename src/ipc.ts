@@ -30,13 +30,8 @@ export function registerIpcHandlers() {
       await creds.saveToken(result.access_token);
       return { success: true };
     } catch (e) {
-      // Sanitize — don't leak deviceCode/clientId in error messages
-      const safeMessage = (e as Error).message.includes('Cancelled')
-        ? 'Cancelled'
-        : (e as Error).message.includes('timed out')
-          ? 'Device flow timed out'
-          : 'Authentication failed';
-      throw new Error(safeMessage);
+      // MVP デバッグ用 — 元のエラーをそのまま伝播（後でサニタイズを再追加予定）
+      throw e;
     }
   });
 
