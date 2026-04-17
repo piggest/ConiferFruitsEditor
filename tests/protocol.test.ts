@@ -1,0 +1,17 @@
+import { describe, it, expect } from 'vitest';
+import { parseEditUrl } from '../src/protocol';
+
+describe('parseEditUrl', () => {
+  it('extracts path from docmdtest://edit?path=X', () => {
+    const url = 'docmdtest://edit?path=docs%2F%E3%82%AC%E3%82%A4%E3%83%89%2Ftest.md';
+    expect(parseEditUrl(url)).toEqual({ action: 'edit', path: 'docs/ガイド/test.md' });
+  });
+
+  it('returns null for unknown action', () => {
+    expect(parseEditUrl('docmdtest://unknown')).toBeNull();
+  });
+
+  it('returns null for missing path on edit', () => {
+    expect(parseEditUrl('docmdtest://edit')).toBeNull();
+  });
+});
