@@ -24,6 +24,7 @@ declare global {
         }): Promise<{ success: boolean }>;
       };
       onEditRequest(cb: (r: { action: string; path: string }) => void): () => void;
+      onMenuLogout(cb: () => void): () => void;
     };
   }
 }

@@ -20,4 +20,9 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('edit-request', handler);
     return () => ipcRenderer.removeListener('edit-request', handler);
   },
+  onMenuLogout: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on('menu:logout', handler);
+    return () => ipcRenderer.removeListener('menu:logout', handler);
+  },
 });

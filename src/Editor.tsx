@@ -5,9 +5,9 @@ import '@blocknote/mantine/style.css';
 import { normalizeMd, splitFrontmatter, decodeLinkUris } from './mdConverter';
 import Toolbar from './Toolbar';
 
-type Props = { path: string; onLogout: () => void };
+type Props = { path: string };
 
-export default function Editor({ path, onLogout }: Props) {
+export default function Editor({ path }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,15 +73,14 @@ export default function Editor({ path, onLogout }: Props) {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', padding: 12, borderBottom: '1px solid #ddd', gap: 12, alignItems: 'center' }}>
+      <Toolbar editor={editor as any} />
+      <div style={{ display: 'flex', padding: 12, borderBottom: '1px solid #ddd', gap: 12, alignItems: 'center', background: '#fff' }}>
         <strong style={{ flex: 1 }}>{path}{dirty && ' *'}</strong>
         <button onClick={handleSave} disabled={!dirty || saving}>
           {saving ? '保存中...' : '編集完了（保存）'}
         </button>
-        <button onClick={onLogout}>ログアウト</button>
       </div>
       {error && <div style={{ padding: 12, color: 'red', background: '#fee' }}>エラー: {error}</div>}
-      <Toolbar editor={editor as any} />
       <div style={{ flex: 1, overflow: 'auto' }}>
         <BlockNoteView editor={editor} onChange={handleChange} />
       </div>
